@@ -44,7 +44,7 @@
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-primary fluency-submit fluency-cta';
-    btn.textContent = 'Check Your AI Fluency →';
+    btn.textContent = 'Check My AI Fluency Level →';
     btn.addEventListener('click', renderQuestion);
     root.appendChild(btn);
   }
