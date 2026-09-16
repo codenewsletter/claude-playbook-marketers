@@ -108,7 +108,7 @@ details.seg[open] .chev{transform:rotate(180deg)}
 .sidebar:hover{width:360px;background:#fff;border:var(--hair);border-radius:20px;box-shadow:0 24px 60px rgba(38,37,30,.16),0 4px 14px rgba(38,37,30,.06);padding:16px 12px 14px;
   max-height:calc(100vh - var(--navh) - 72px);animation:panelIn .22s var(--e);transform-origin:left center;left:14px}
 .sidebar:hover .rail-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 6px 12px;margin-bottom:6px;border-bottom:var(--hair-thin)}
-.sidebar:hover .rail-count{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone)}
+.rail-count{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone)}
 .sidebar:hover .sidebar-index-title{display:inline-flex;opacity:1;margin:0;padding:6px 10px;background:var(--bone);color:var(--ink)}
 .sidebar:hover details.seg{display:block;opacity:1;margin:0;padding:8px 0 6px;border-top:var(--hair-thin)}
 .sidebar:hover details.seg:first-of-type{border-top:none}
@@ -139,6 +139,8 @@ details.seg[open] .chev{transform:rotate(180deg)}
 @media (max-width:1100px){
   .seg-list li,.sidebar details.seg,.sidebar-index-title,.sidebar details.seg>.seg-head,.rail-head{display:block!important;opacity:1!important}
   .sidebar details.seg>.seg-head,.rail-head{display:flex!important}
+  .rail-head{align-items:center;justify-content:space-between;padding:0 6px 12px;margin-bottom:6px;border-bottom:var(--hair-thin)}
+  .sidebar .sidebar-index-title{display:inline-flex;margin:0;padding:6px 10px;background:var(--sage);color:var(--ink)}
   .sidebar .lrow .lname{display:block;font-family:var(--sans);font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:500;white-space:normal}
   .sidebar .lrow{color:var(--ink-soft)}
 }
