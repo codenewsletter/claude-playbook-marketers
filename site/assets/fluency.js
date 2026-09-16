@@ -1,6 +1,5 @@
-// Inline one-question AI fluency check on the landing page.
-// Three-stage interactive flow: intro CTA -> question -> instant result.
-// The hero heading/subtext step aside once the question appears, so each stage reads as its own screen.
+// Landing page: onboarding-style fluency check.
+// Three screens (hero -> one question -> your level), progress bar, confetti on the result.
 (function () {
   var OPTIONS = [
     {
@@ -26,97 +25,67 @@
     }
   ];
 
-  var root = document.getElementById('fluency-root');
-  if (!root) return;
-
-  var heroTitle = document.getElementById('hero-title');
-  var heroSub = document.getElementById('hero-sub');
+  var screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  if (!screens.length) return;
+  var bar = document.getElementById('progress-bar');
+  var choices = document.getElementById('choices');
+  if (choices) choices.setAttribute('role', 'radiogroup');
+  var showBtn = document.getElementById('show-level');
+  var RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var selected = null;
 
-  function setHeroVisible(visible) {
-    if (heroTitle) heroTitle.hidden = !visible;
-    if (heroSub) heroSub.hidden = !visible;
+  function go(n) {
+    screens.forEach(function (sc) { sc.classList.toggle('on', +sc.dataset.s === n); });
+    if (bar) bar.style.width = (n / (screens.length - 1) * 100) + '%';
+    var scr = screens[n];
+    if (scr) scr.scrollTop = 0;
+    if (n === 2) confetti();
   }
 
-  function renderIntro() {
-    setHeroVisible(true);
-    root.innerHTML = '';
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-primary fluency-submit fluency-cta';
-    btn.textContent = 'Check My AI Fluency Level →';
-    btn.addEventListener('click', renderQuestion);
-    root.appendChild(btn);
-  }
-
-  function renderQuestion() {
-    setHeroVisible(false);
-    root.innerHTML = '';
-    var wrap = document.createElement('div');
-    wrap.className = 'fluency-plain';
-
-    var headline = document.createElement('h2');
-    headline.className = 'fluency-headline';
-    headline.innerHTML = 'Which sounds <span class="accent">most like you?</span>';
-    wrap.appendChild(headline);
-
-    var opts = document.createElement('div');
-    opts.className = 'fluency-options';
-    OPTIONS.forEach(function (opt, i) {
-      var row = document.createElement('label');
-      row.className = 'fluency-option';
-      if (selected === i) row.classList.add('selected');
-      row.innerHTML = '<span class="radio"></span><span>' + opt.t + '</span>';
-      row.addEventListener('click', function () {
-        selected = i;
-        renderQuestion();
-      });
-      opts.appendChild(row);
+  // Choices
+  OPTIONS.forEach(function (opt, i) {
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'ch rv';
+    el.style.setProperty('--d', (0.1 + i * 0.05) + 's');
+    el.setAttribute('role', 'radio'); el.setAttribute('aria-checked', 'false');
+    el.innerHTML = '<span class="box" aria-hidden="true"><span class="tick">&#10003;</span></span><span>' + opt.t + '</span>';
+    el.addEventListener('click', function () {
+      selected = i;
+      Array.prototype.forEach.call(choices.children, function (c, j) { c.classList.toggle('pick', j === i); c.setAttribute('aria-checked', j === i ? 'true' : 'false'); });
+      showBtn.disabled = false;
     });
-    wrap.appendChild(opts);
+    choices.appendChild(el);
+  });
 
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-primary fluency-submit';
-    btn.textContent = 'Show My AI Fluency Level →';
-    btn.disabled = selected === null;
-    btn.addEventListener('click', renderResult);
-    wrap.appendChild(btn);
-
-    var back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'fluency-back';
-    back.textContent = '← Back';
-    back.addEventListener('click', function () {
-      selected = null;
-      renderIntro();
-    });
-    wrap.appendChild(back);
-
-    root.appendChild(wrap);
-  }
-
-  function renderResult() {
-    setHeroVisible(false);
+  showBtn.addEventListener('click', function () {
+    if (selected === null) return;
     var opt = OPTIONS[selected];
-    root.innerHTML = '';
-    var card = document.createElement('div');
-    card.className = 'fluency-card fluency-result';
-    card.innerHTML =
-      '<div class="fluency-label">Your level</div>' +
-      '<h2>' + opt.level + '</h2>' +
-      '<p>' + opt.reason + '</p>' +
-      '<a class="btn btn-primary fluency-submit" href="' + opt.href + '">Start Learning →</a>';
+    document.getElementById('result-level').textContent = opt.level;
+    document.getElementById('result-start').setAttribute('href', opt.href);
+    go(2);
+  });
 
-    var back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'fluency-back';
-    back.textContent = 'Change my answer';
-    back.addEventListener('click', renderQuestion);
-    card.appendChild(back);
+  document.querySelectorAll('[data-go]').forEach(function (b) {
+    b.addEventListener('click', function () { go(+b.dataset.go); });
+  });
 
-    root.appendChild(card);
+  // Confetti (from the Academy onboarding survey)
+  function confetti() {
+    var cv = document.getElementById('confetti');
+    if (!cv) return;
+    var c = cv.getContext('2d');
+    cv.width = innerWidth; cv.height = innerHeight;
+    var cols = ['#ff5c35', '#3ef06c', '#f8ecca', '#dcebf7', '#26251e'], P = [];
+    for (var i = 0; i < 130; i++) P.push({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * .5, v: 2.2 + Math.random() * 3, w: 5 + Math.random() * 6, a: Math.random() * 6.3, s: (Math.random() < .5 ? -1 : 1) * (.05 + Math.random() * .07), col: cols[i % 5] });
+    var t0 = Date.now(), dur = RM ? 300 : 2200;
+    (function tick() {
+      c.clearRect(0, 0, cv.width, cv.height);
+      var dt = Date.now() - t0;
+      P.forEach(function (p) { p.y += p.v; p.a += p.s; c.save(); c.translate(p.x, p.y); c.rotate(p.a); c.fillStyle = p.col; c.globalAlpha = Math.max(0, 1 - dt / dur); c.fillRect(-p.w / 2, -p.w / 2, p.w, p.w * .6); c.restore(); });
+      if (dt < dur) requestAnimationFrame(tick); else c.clearRect(0, 0, cv.width, cv.height);
+    })();
   }
 
-  renderIntro();
+  go(0);
 })();

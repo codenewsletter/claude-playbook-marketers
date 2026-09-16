@@ -58,7 +58,7 @@ function renderLessonTitle(lesson) {
   const title = lesson.title;
   if (!accent || !title.endsWith(accent)) return renderInline(title);
   const normalPart = title.slice(0, title.length - accent.length);
-  return `${renderInline(normalPart)}<span class="accent">${renderInline(accent)}</span>`;
+  return `${renderInline(normalPart)}<em>${renderInline(accent)}</em>`;
 }
 
 // Every link in lesson/module content is an external source citation — open in a new tab.
@@ -198,52 +198,221 @@ function moduleHref(n) {
   return `/module-${n}.html`;
 }
 
-// ---------- Sidebar ----------
+// ---------- Sidebar: hub segments (one collapsible row per module, progress ring, visited ticks) ----------
 function renderSidebar(activeHref) {
   const groups = modules.map(mod => {
     const meta = MODULE_META[mod.number];
+    const isCurrent = activeHref === moduleHref(mod.number) || mod.lessons.some(l => lessonHref(l) === activeHref);
     const items = mod.lessons.map(l => {
       const href = lessonHref(l);
       const active = href === activeHref ? ' active' : '';
-      return `<li><a class="${active.trim()}" href="${href}"><span class="num">${l.number}</span>${renderInline(l.title)}</a></li>`;
+      return `<li><a class="lrow${active}" href="${href}" data-lesson="${l.slug}" title="${l.number} ${l.title.replace(/"/g, '&quot;')}"><span class="num">${l.number}</span><span class="lname">${renderInline(l.title)}</span></a></li>`;
     }).join('');
     return `
-      <div class="sidebar-group">
-        <a class="sidebar-module-link" href="${moduleHref(mod.number)}">Module ${mod.number}: ${renderInline(mod.title)}</a>
-        <ol class="sidebar-lessons">${items}</ol>
-      </div>`;
+      <details class="seg"${isCurrent ? ' open' : ''} data-module="${mod.number}">
+        <summary class="seg-head">
+          <span class="seg-name"><b><a href="${moduleHref(mod.number)}" title="Module ${mod.number}: ${mod.title.replace(/"/g, '&quot;')}">Module ${mod.number}</a></b></span>
+          <span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </summary>
+        <ol class="seg-list">${items}</ol>
+      </details>`;
   }).join('');
 
   return `
     <aside class="sidebar">
-      <a class="sidebar-index-title" href="/contents.html">In This Playbook</a>
+      <div class="rail-head"><a class="sidebar-index-title${activeHref === '/contents.html' ? ' active' : ''}" href="/contents.html">In This Playbook</a><span class="rail-count">${allLessons.length} lessons</span></div>
       ${groups}
     </aside>`;
 }
+const renderLessonSidebar = renderSidebar;
 
 const NEWSLETTER_URL = 'https://superhuman-marketing.beehiiv.com/subscribe';
 
-const BRAND_LOGO = `
-  <a class="brand-logo" href="/index.html">
-    <span class="brand-logo-icon">📣</span>
-    <span>Marketing Standup</span>
-  </a>`;
+// ---------- Lesson pages (Superhuman Academy design: dark opener + wash bands) ----------
+const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap';
 
-function topNav(withMenuToggle) {
-  return `
-  <div class="top-nav">
-    <div class="top-nav-in">
-      <div class="top-nav-left">
-        ${withMenuToggle ? '<button class="menu-toggle" data-sidebar-toggle type="button" aria-label="Open menu">☰</button>' : ''}
-        ${BRAND_LOGO}
-      </div>
-      <a class="btn-subscribe" href="${NEWSLETTER_URL}" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
-    </div>
-  </div>`;
+// Opener variant rotates by global lesson order so consecutive lessons never match.
+const OPENERS = ['neon', 'sky', 'gold', 'coral'];
+const openerFor = lesson => OPENERS[allLessons.indexOf(lesson) % OPENERS.length];
+
+
+// Group a lesson's sections into bands: story (sky) / how it works (parchment) / watch (sage) /
+// worksheet (lilac) / get started (butter). Content inside each section is untouched.
+function bandLesson(bodyHtml) {
+  // Module wrap-up ("By this point you should have:" + list) becomes a white card, like the personalize callout.
+  bodyHtml = bodyHtml.replace(/(?:<hr>\s*)?<p>By this point you should have:<\/p>\s*<ul>([\s\S]*?)<\/ul>/,
+    '<div class="wrapup-card"><div class="wrapup-title">By this point you should have:</div><ul>$1</ul></div>');
+  const sections = bodyHtml.split('</section>').map(x => x.trim()).filter(Boolean).map(x => x + '</section>');
+  const kind = x => (x.match(/^<section class="([a-z-]+)"/) || [])[1];
+  const bands = [];
+  const push = (wash, label) => { bands.push({ wash, label, parts: [] }); return bands[bands.length - 1]; };
+  let cur = null, seenTry = false;
+  sections.forEach((sec, i) => {
+    const k = kind(sec);
+    if (i === 0) cur = push('sky', 'The story');
+    else if (k === 'video-section') cur = push('sage', 'Watch');
+    else if (k === 'tryit-section') { cur = push('lilac', 'Hands-on Worksheet'); seenTry = true; }
+    else if (k === 'prompt-section' || (seenTry && k === 'content-section')) { if (!cur || cur.wash !== 'butter') cur = push('butter', 'Get started'); }
+    else if (cur.wash !== 'parchment') cur = push('parchment', 'How it works');
+    cur.parts.push(sec);
+  });
+  return bands.map(b => `
+      <section class="band" data-wash="${b.wash}">
+        <div class="band-in">
+          <div class="band-label">${b.label}</div>
+          <div class="lesson-body">
+            ${b.parts.join('\n')}
+          </div>
+        </div>
+      </section>`).join('');
 }
 
-// ---------- Page shell ----------
-function page({ title, description, bodyClass, content, extraHead = '', extraScripts = '', withMenuToggle = false }) {
+function lessonPage({ lesson, content }) {
+  const [mj, mi] = lesson.number.split('.');
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${lesson.number} ${lesson.title} — Claude Playbook for Marketers</title>
+<meta name="description" content="${lesson.title}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${FONTS_HREF}" rel="stylesheet">
+<link rel="stylesheet" href="/assets/lesson.css?v=${BUILD_ID}">
+</head>
+<body data-lesson="${lesson.slug}">
+  <div class="topbar">
+    <div class="tb-in">
+      <div class="tb-left">
+        <button class="menu-toggle" data-sidebar-toggle type="button" aria-label="Open menu">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <a class="tb-brand" href="/index.html">Marketing Standup</a>
+      </div>
+      <div class="tb-right">
+        <a class="tb-btn" href="${NEWSLETTER_URL}" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
+      </div>
+    </div>
+  </div>
+  <div class="app">
+    ${renderLessonSidebar(lessonHref(lesson))}
+    ${content}
+  </div>
+<script src="/assets/main.js?v=${BUILD_ID}"></script>
+</body>
+</html>`;
+}
+
+allLessons.forEach((lesson, i) => {
+  const prev = allLessons[i - 1];
+  const next = allLessons[i + 1];
+  const [mj, mi] = lesson.number.split('.');
+
+  // Prev/next cards carry the opener branding of the lesson they lead to.
+  const navCard = (l, cls, dir) => l
+    ? `<a class="${cls}" href="${lessonHref(l)}" data-opener="${openerFor(l)}"><span class="dir">${dir}</span><span class="lbl">${l.number} ${renderInline(l.title)}</span></a>`
+    : '<div class="nav-empty"></div>';
+  const nav = `<div class="lesson-nav">
+      ${navCard(prev, 'prev', '&larr; Previous')}
+      ${navCard(next, 'next', 'Next &rarr;')}
+    </div>`;
+
+  const content = `<main class="content">
+      <section class="band band-hero" data-wash="dark" data-opener="${openerFor(lesson)}">
+        <div class="band-in">
+          <div class="kick">Module ${mj} · Lesson ${mi}</div>
+          <h1 class="lesson-title">${renderLessonTitle(lesson)}</h1>
+        </div>
+      </section>
+      ${bandLesson(renderLessonBody(lesson.body))}
+      <section class="band band-nav" data-wash="parchment"><div class="band-in">${nav}</div></section>
+    </main>`;
+
+  fs.writeFileSync(path.join(SITE, 'lessons', `${lesson.slug}.html`), lessonPage({ lesson, content }));
+});
+
+// ---------- Module overview pages ----------
+const MODULE_ACCENT = { 1: 'In A Browser Tab', 2: 'With Your Files And Tools', 3: 'In The Terminal' };
+// Module page takes the opener slot just before its first lesson, so module -> lesson 1 never repeats.
+const moduleOpener = mod => OPENERS[(allLessons.indexOf(mod.lessons[0]) - 1 + OPENERS.length) % OPENERS.length];
+function renderModuleTitle(mod) {
+  const acc = MODULE_ACCENT[mod.number];
+  const t = mod.title;
+  return acc && t.endsWith(acc) ? `${renderInline(t.slice(0, t.length - acc.length))}<em>${renderInline(acc)}</em>` : renderInline(t);
+}
+
+function modulePageNew(mod) {
+  const meta = MODULE_META[mod.number];
+  const introHtml = marked.parse(mod.introRaw);
+  const rows = mod.lessons.map(l => `
+      <a class="mrow" href="${lessonHref(l)}">
+        <span class="mrow-num">${l.number}</span>
+        <span class="mrow-title">${renderInline(l.title)}</span>
+        <span class="mrow-arrow" aria-hidden="true">&rarr;</span>
+      </a>`).join('');
+  const prevMod = modules[mod.number - 2];
+  const nextMod = modules[mod.number];
+  const modCard = (m, cls, dir) => m
+    ? `<a class="${cls}" href="${moduleHref(m.number)}" data-opener="${moduleOpener(m)}"><span class="dir">${dir}</span><span class="lbl">Module ${m.number} · ${renderInline(m.title)}</span></a>`
+    : (cls === 'prev'
+        ? `<a class="prev" href="/contents.html" data-opener="neon"><span class="dir">&larr; Back</span><span class="lbl">In This Playbook</span></a>`
+        : `<a class="next" href="/contents.html" data-opener="neon"><span class="dir">Next &rarr;</span><span class="lbl">In This Playbook</span></a>`);
+
+  const content = `<main class="content">
+      <section class="band band-hero" data-wash="dark" data-opener="${moduleOpener(mod)}">
+        <div class="band-in">
+          <div class="kick">Module ${mod.number} · ${meta.badge}</div>
+          <h1 class="lesson-title">${renderModuleTitle(mod)}</h1>
+          <a class="btn-hero" href="${lessonHref(mod.lessons[0])}">Start Module ${mod.number} <span class="ar">&rarr;</span></a>
+        </div>
+      </section>
+      <section class="band band-lessons" data-wash="mint">
+        <div class="band-in">
+          <div class="band-label">Lessons</div>
+          <div class="mlist">${rows}</div>
+        </div>
+      </section>
+    </main>`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module ${mod.number}: ${mod.title} — Claude Playbook for Marketers</title>
+<meta name="description" content="${mod.title}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${FONTS_HREF}" rel="stylesheet">
+<link rel="stylesheet" href="/assets/lesson.css?v=${BUILD_ID}">
+</head>
+<body>
+  <div class="topbar">
+    <div class="tb-in">
+      <div class="tb-left">
+        <a class="tb-brand" href="/index.html">Marketing Standup</a>
+      </div>
+      <div class="tb-right">
+        <a class="tb-btn" href="${NEWSLETTER_URL}" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
+      </div>
+    </div>
+  </div>
+  <div class="app no-rail">
+    ${content}
+  </div>
+<script src="/assets/main.js?v=${BUILD_ID}"></script>
+</body>
+</html>`;
+}
+
+modules.forEach(mod => {
+  fs.writeFileSync(path.join(SITE, `module-${mod.number}.html`), modulePageNew(mod));
+});
+
+// ---------- Full contents index page ----------
+// Shell shared with lesson/module pages (topbar, sidebar, footer).
+function shellPage({ title, description, activeHref, content }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -251,143 +420,125 @@ function page({ title, description, bodyClass, content, extraHead = '', extraScr
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <meta name="description" content="${description}">
-<link rel="stylesheet" href="/assets/style.css?v=${BUILD_ID}">
-${extraHead}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${FONTS_HREF}" rel="stylesheet">
+<link rel="stylesheet" href="/assets/lesson.css?v=${BUILD_ID}">
 </head>
-<body class="${bodyClass || ''}">
-${topNav(withMenuToggle)}
-${content}
-<script src="/assets/main.js"></script>
-${extraScripts}
+<body>
+  <div class="topbar">
+    <div class="tb-in">
+      <div class="tb-left">
+        <button class="menu-toggle" data-sidebar-toggle type="button" aria-label="Open menu">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <a class="tb-brand" href="/index.html">Marketing Standup</a>
+      </div>
+      <div class="tb-right">
+        <a class="tb-btn" href="${NEWSLETTER_URL}" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
+      </div>
+    </div>
+  </div>
+  <div class="app">
+    ${renderLessonSidebar(activeHref)}
+    ${content}
+  </div>
+<script src="/assets/main.js?v=${BUILD_ID}"></script>
 </body>
 </html>`;
 }
 
-// ---------- Lesson pages ----------
-allLessons.forEach((lesson, i) => {
-  const prev = allLessons[i - 1];
-  const next = allLessons[i + 1];
-  const href = lessonHref(lesson);
-
-  const nav = `
-    <div class="lesson-nav">
-      ${prev ? `<a class="prev" href="${lessonHref(prev)}"><span class="dir">← Previous</span>${prev.number} ${renderInline(prev.title)}</a>` : '<div class="nav-empty"></div>'}
-      ${next ? `<a class="next" href="${lessonHref(next)}"><span class="dir">Next →</span>${next.number} ${renderInline(next.title)}</a>` : '<div class="nav-empty"></div>'}
-    </div>`;
-
-  const content = `
-    <div class="app">
-      ${renderSidebar(href)}
-      <main class="content">
-        <div class="lesson-wrap">
-          <h1 class="lesson-title">${renderInline(lesson.title)}</h1>
-          <div class="lesson-body">
-            ${renderLessonBody(lesson.body)}
-          </div>
-          ${nav}
-        </div>
-      </main>
-    </div>`;
-
-  const html = page({
-    title: `${lesson.number} ${lesson.title} — Claude Playbook for Marketers`,
-    description: lesson.title,
-    content,
-    withMenuToggle: true
-  });
-  fs.writeFileSync(path.join(SITE, 'lessons', `${lesson.slug}.html`), html);
-});
-
-// ---------- Module overview pages ----------
-modules.forEach(mod => {
-  const meta = MODULE_META[mod.number];
-  const introHtml = marked.parse(mod.introRaw);
-  const rows = mod.lessons.map(l => `
-    <a class="lesson-row" href="${lessonHref(l)}">
-      <span class="num">${l.number}</span>
-      <span class="title">${renderInline(l.title)}</span>
-      <span class="arrow">→</span>
-    </a>`).join('');
-
-  const content = `
-    <div class="app">
-      ${renderSidebar(moduleHref(mod.number))}
-      <main class="content">
-        <div class="module-hero">
-          <h1>Module ${mod.number}: ${renderInline(mod.title)}</h1>
-          <div class="lede">${introHtml}</div>
-          <a class="btn btn-primary" href="${lessonHref(mod.lessons[0])}" style="margin-top:18px;">Start Module ${mod.number}</a>
-        </div>
-        <div class="module-list">
-          <div class="eyebrow">Lessons In This Module</div>
-          ${rows}
-        </div>
-      </main>
-    </div>`;
-
-  const html = page({
-    title: `Module ${mod.number}: ${mod.title} — Claude Playbook for Marketers`,
-    description: mod.title,
-    content,
-    withMenuToggle: true
-  });
-  fs.writeFileSync(path.join(SITE, `module-${mod.number}.html`), html);
-});
-
-// ---------- Full contents index page ----------
-const contentsGroups = modules.map(mod => {
+const CONTENTS_WASH = { 1: 'sky', 2: 'lilac', 3: 'butter' };
+const contentsBands = modules.map(mod => {
   const meta = MODULE_META[mod.number];
   const rows = mod.lessons.map(l => `
-    <a class="lesson-row" href="${lessonHref(l)}">
-      <span class="num">${l.number}</span>
-      <span class="title">${renderInline(l.title)}</span>
-      <span class="arrow">→</span>
-    </a>`).join('');
+      <a class="mrow" href="${lessonHref(l)}">
+        <span class="mrow-num">${l.number}</span>
+        <span class="mrow-title">${renderInline(l.title)}</span>
+        <span class="mrow-arrow" aria-hidden="true">&rarr;</span>
+      </a>`).join('');
   return `
-    <div class="module-list contents-list">
-      <div class="contents-module-header">
-        <a href="${moduleHref(mod.number)}" class="contents-module-link">Module ${mod.number}: ${renderInline(mod.title)}</a>
-        <span class="contents-module-meta">${meta.badge} · ${mod.lessons.length} lessons</span>
-      </div>
-      ${rows}
-    </div>`;
-}).join('<div style="height:28px"></div>');
+      <section class="band" data-wash="${CONTENTS_WASH[mod.number]}">
+        <div class="band-in">
+          <div class="band-label">Module ${mod.number} · ${meta.badge}</div>
+          <a class="contents-module" href="${moduleHref(mod.number)}"><h2>${renderModuleTitle(mod)}</h2></a>
+          <div class="mlist">${rows}</div>
+        </div>
+      </section>`;
+}).join('');
 
-const contentsContent = `
-  <div class="app">
-    ${renderSidebar('/contents.html')}
-    <main class="content">
-      <div class="module-hero">
-        <h1>In This Playbook</h1>
-      </div>
-      ${contentsGroups}
-    </main>
-  </div>`;
+const contentsContent = `<main class="content">
+      <section class="band band-hero" data-wash="dark" data-opener="${OPENERS[(0 - 2 + OPENERS.length * 2) % OPENERS.length]}">
+        <div class="band-in">
+          <div class="kick">${modules.length} modules · ${allLessons.length} lessons</div>
+          <h1 class="lesson-title">In This <em>Playbook</em></h1>
+        </div>
+      </section>
+      ${contentsBands}
+    </main>`;
 
-fs.writeFileSync(path.join(SITE, 'contents.html'), page({
+fs.writeFileSync(path.join(SITE, 'contents.html'), shellPage({
   title: 'In This Playbook — Claude Playbook for Marketers',
   description: 'Full index of every module and lesson in the Claude Playbook for Marketers.',
-  content: contentsContent,
-  withMenuToggle: true
+  activeHref: '/contents.html',
+  content: contentsContent
 }));
 
-// ---------- Landing page (headline + inline one-question fluency check) ----------
-const landingContent = `
-<header class="page-hero">
-  <div class="wrap">
-    <h1 id="hero-title">Claude Code Playbook <span class="accent">for Marketers</span></h1>
-    <p class="sub" id="hero-sub">Your starter guide to become a Marketing Engineer. 32 hands-on lessons and real workflows from marketers and GTM teams already running their work through Claude.</p>
+// ---------- Landing page: dark hero with fluency check + one band per module ----------
+const landingContent = `<div class="progress" aria-hidden="true"><i id="progress-bar"></i></div>
+  <main class="stage" id="stage">
+    <section class="screen band-hero on" data-s="0" data-wash="dark" data-opener="coral">
+      <div class="inner">
+        <h1 class="lesson-title rv" style="--d:.06s">Claude Code Playbook <em>for Marketers</em></h1>
+        <p class="hero-sub rv" style="--d:.12s">Your starter guide to become a Marketing Engineer. 32 hands-on lessons and real workflows from marketers and GTM teams already running their work through Claude.</p>
+        <button class="btn-hero rv" style="--d:.18s" type="button" data-go="1">Check My AI Fluency Level <span class="ar">&rarr;</span></button>
+      </div>
+    </section>
+    <section class="screen" data-s="1" data-wash="sage">
+      <div class="inner">
+        <h2 class="lesson-title rv" style="--d:.05s">Which sounds <em>most like you?</em></h2>
+        <div class="choices one" id="choices"></div>
+        <button class="btn-cta rv" style="--d:.2s" type="button" id="show-level" disabled>Show My AI Fluency Level <span class="ar">&rarr;</span></button>
+        <button class="fluency-back rv" style="--d:.25s" type="button" data-go="0">&larr; Back</button>
+      </div>
+    </section>
+    <section class="screen" data-s="2" data-wash="mint">
+      <div class="inner">
+        <div class="qnum rv">Your level</div>
+        <h2 class="lesson-title rv" style="--d:.05s" id="result-level"></h2>
+        <a class="btn-cta rv" style="--d:.18s" id="result-start" href="#">Start Learning <span class="ar">&rarr;</span></a>
+        <button class="fluency-back rv" style="--d:.25s" type="button" data-go="1">Change my answer</button>
+      </div>
+    </section>
+  </main>
+  <canvas class="confetti" id="confetti" width="0" height="0" aria-hidden="true"></canvas>`;
 
-    <div class="fluency" id="fluency-root"></div>
+fs.writeFileSync(path.join(SITE, 'index.html'), `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Claude Playbook for Marketers</title>
+<meta name="description" content="Hands-on lessons for AI-first marketers, drawn from real practitioners using Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${FONTS_HREF}" rel="stylesheet">
+<link rel="stylesheet" href="/assets/lesson.css?v=${BUILD_ID}">
+</head>
+<body class="landing">
+  <div class="topbar">
+    <div class="tb-in">
+      <div class="tb-left">
+        <a class="tb-brand" href="/index.html">Marketing Standup</a>
+      </div>
+      <div class="tb-right">
+        <a class="tb-btn" href="${NEWSLETTER_URL}" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
+      </div>
+    </div>
   </div>
-</header>
-`;
-
-fs.writeFileSync(path.join(SITE, 'index.html'), page({
-  title: 'The Claude Playbook for Marketers',
-  description: 'Hands-on lessons for AI-first marketers, drawn from real practitioners using Claude.',
-  content: landingContent,
-  extraScripts: '<script src="/assets/fluency.js"></script>'
-}));
+  ${landingContent}
+<script src="/assets/fluency.js?v=${BUILD_ID}"></script>
+</body>
+</html>`);
 
 console.log(`Generated ${allLessons.length} lesson pages, ${modules.length} module pages, index.html.`);

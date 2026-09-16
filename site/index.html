@@ -5,35 +5,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Claude Playbook for Marketers</title>
 <meta name="description" content="Hands-on lessons for AI-first marketers, drawn from real practitioners using Claude.">
-<link rel="stylesheet" href="/assets/style.css?v=1788790429753">
-
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/lesson.css?v=1789575400735">
 </head>
-<body class="">
-
-  <div class="top-nav">
-    <div class="top-nav-in">
-      <div class="top-nav-left">
-        
-        
-  <a class="brand-logo" href="/index.html">
-    <span class="brand-logo-icon">📣</span>
-    <span>Marketing Standup</span>
-  </a>
+<body class="landing">
+  <div class="topbar">
+    <div class="tb-in">
+      <div class="tb-left">
+        <a class="tb-brand" href="/index.html">Marketing Standup</a>
       </div>
-      <a class="btn-subscribe" href="https://superhuman-marketing.beehiiv.com/subscribe" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
+      <div class="tb-right">
+        <a class="tb-btn" href="https://superhuman-marketing.beehiiv.com/subscribe" target="_blank" rel="noopener noreferrer">Subscribe to Newsletter</a>
+      </div>
     </div>
   </div>
-
-<header class="page-hero">
-  <div class="wrap">
-    <h1 id="hero-title">Claude Code Playbook <span class="accent">for Marketers</span></h1>
-    <p class="sub" id="hero-sub">Your starter guide to become a Marketing Engineer. 32 hands-on lessons and real workflows from marketers and GTM teams already running their work through Claude.</p>
-
-    <div class="fluency" id="fluency-root"></div>
-  </div>
-</header>
-
-<script src="/assets/main.js"></script>
-<script src="/assets/fluency.js"></script>
+  <div class="progress" aria-hidden="true"><i id="progress-bar"></i></div>
+  <main class="stage" id="stage">
+    <section class="screen band-hero on" data-s="0" data-wash="dark" data-opener="coral">
+      <div class="inner">
+        <h1 class="lesson-title rv" style="--d:.06s">Claude Code Playbook <em>for Marketers</em></h1>
+        <p class="hero-sub rv" style="--d:.12s">Your starter guide to become a Marketing Engineer. 32 hands-on lessons and real workflows from marketers and GTM teams already running their work through Claude.</p>
+        <button class="btn-hero rv" style="--d:.18s" type="button" data-go="1">Check My AI Fluency Level <span class="ar">&rarr;</span></button>
+      </div>
+    </section>
+    <section class="screen" data-s="1" data-wash="sage">
+      <div class="inner">
+        <h2 class="lesson-title rv" style="--d:.05s">Which sounds <em>most like you?</em></h2>
+        <div class="choices one" id="choices"></div>
+        <button class="btn-cta rv" style="--d:.2s" type="button" id="show-level" disabled>Show My AI Fluency Level <span class="ar">&rarr;</span></button>
+        <button class="fluency-back rv" style="--d:.25s" type="button" data-go="0">&larr; Back</button>
+      </div>
+    </section>
+    <section class="screen" data-s="2" data-wash="mint">
+      <div class="inner">
+        <div class="qnum rv">Your level</div>
+        <h2 class="lesson-title rv" style="--d:.05s" id="result-level"></h2>
+        <a class="btn-cta rv" style="--d:.18s" id="result-start" href="#">Start Learning <span class="ar">&rarr;</span></a>
+        <button class="fluency-back rv" style="--d:.25s" type="button" data-go="1">Change my answer</button>
+      </div>
+    </section>
+  </main>
+  <canvas class="confetti" id="confetti" width="0" height="0" aria-hidden="true"></canvas>
+<script src="/assets/fluency.js?v=1789575400735"></script>
 </body>
 </html>
