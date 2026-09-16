@@ -371,6 +371,14 @@ body.landing{overflow:hidden;height:100dvh}
 .btn-cta:disabled{background:var(--stone);color:#fff;cursor:not-allowed;transform:none;box-shadow:0 4px 0 #a9a9a4}
 .confetti{position:fixed;inset:0;pointer-events:none;z-index:80}
 
+/* ---------- motion (lesson pages flagged .motion) ---------- */
+/* reveal: opacity + a few px of rise, never height. Landing keeps its own .rv keyframe. */
+body.motion .rv{opacity:0;transform:translateY(14px);animation:none;transition:opacity .7s cubic-bezier(.22,.61,.36,1),transform .7s cubic-bezier(.22,.61,.36,1);transition-delay:var(--d,0s);will-change:opacity,transform}
+body.motion .rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  body.motion .rv{opacity:1;transform:none;transition:none}
+}
+
 /* ---------- diagrams: ink for structure, forest for emphasis, washes for categories, never orange ---------- */
 .diagram-card{margin:30px 0;padding:24px;background:#fff;border:var(--hair);border-radius:16px;box-shadow:var(--shadow-soft)}
 .diagram-caption{margin-top:18px;padding-top:14px;border-top:var(--hair-thin);font-family:var(--serif);font-style:italic;font-size:15px;color:var(--mut);text-align:center;line-height:1.45}

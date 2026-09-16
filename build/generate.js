@@ -236,6 +236,8 @@ const OPENERS = ['neon', 'sky', 'gold', 'coral'];
 const openerFor = lesson => OPENERS[allLessons.indexOf(lesson) % OPENERS.length];
 
 
+
+
 // Group a lesson's sections into bands: story (sky) / how it works (parchment) / watch (sage) /
 // worksheet (lilac) / get started (butter). Content inside each section is untouched.
 function bandLesson(bodyHtml) {
@@ -281,7 +283,7 @@ function lessonPage({ lesson, content }) {
 <link href="${FONTS_HREF}" rel="stylesheet">
 <link rel="stylesheet" href="/assets/lesson.css?v=${BUILD_ID}">
 </head>
-<body data-lesson="${lesson.slug}">
+<body data-lesson="${lesson.slug}" class="motion">
   <div class="topbar">
     <div class="tb-in">
       <div class="tb-left">
